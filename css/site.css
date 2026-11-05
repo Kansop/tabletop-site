@@ -66,3 +66,17 @@ footer a{color:#a8adb8;text-decoration:none;display:block;padding:10px 0;min-hei
 img{max-width:100%;height:auto}
 /* Bigger tap area for inline text links (layout unchanged) */
 main p a:not(.btn),main li a:not(.btn),.price p a{display:inline-block;padding:12px 4px;margin:-12px -4px;position:relative}
+/* Phone quick actions. Same 860px breakpoint as the burger menu. Shown by js/site.js only after the hero scrolls away. */
+.dock{display:none}
+@media(max-width:860px){
+:root{--dock-space:calc(72px + env(safe-area-inset-bottom,0px))}
+.dock{display:flex;position:fixed;z-index:40;left:0;right:0;bottom:0;gap:10px;align-items:stretch;max-width:100%;padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));background:rgba(251,250,247,.94);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-top:1px solid var(--line);box-shadow:0 -10px 30px rgba(20,22,26,.08)}
+.dock[hidden]{display:none!important}
+.dock .btn{flex:1 1 auto;min-width:0;min-height:46px;padding:0 16px}
+.dock .btn.ghost{flex:0 0 auto}
+body.has-dock{padding-bottom:var(--dock-space)}
+html:has(body.has-dock){scroll-padding-bottom:var(--dock-space)}
+}
+@media(min-width:861px){.dock{display:none!important}body.has-dock{padding-bottom:0}}
+@media(prefers-reduced-motion:reduce){.dock{transition:none;animation:none}}
+@media print{.dock{display:none!important}body.has-dock{padding-bottom:0}}
