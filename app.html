@@ -1720,8 +1720,10 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
       }
       if (!table) {
         container.innerHTML = '<div class="ttq-c">' + head() + '<div class="ttq-err">' +
-          (tableId ? 'This QR code is for a table we can\'t find (' + esc(tableId) + '). Please ask a team member for help.' : 'This ordering link is missing a table number. Please scan the QR code on your table again.') +
-          '</div><p class="ttq-hint">' + (srv ? 'A team member can take your order meanwhile.' : 'If the menu does not show up on your phone, please ask a team member to take your order.') + '</p></div>';
+          (!tableId ? 'This ordering link is missing a table number. Please scan the QR code on your table again.' :
+            srv ? 'We couldn\'t open the menu for table ' + esc(tableId) + '. The restaurant may not have published its online menu yet, or this QR code is for a table that is no longer set up. Please ask a team member for help.' :
+            'This QR code is for a table we can\'t find (' + esc(tableId) + '). Please ask a team member for help.') +
+          '</div>' + (srv && tableId ? '<button id="ttq-retry">Try again</button>' : '') + '<p class="ttq-hint">' + (srv ? 'A team member can take your order meanwhile.' : 'If the menu does not show up on your phone, please ask a team member to take your order.') + '</p></div>';
         return;
       }
       var m = menu(), c = cart(), html = '';
@@ -2415,7 +2417,7 @@ function demoData(){const keepPin=DB?.settings?.pin||'';const d=blank();DB=d;d.s
 // ---------- modal & forms ----------
 function modal(html,onSubmit){$('#modal-body').innerHTML=html;modalFrom=document.activeElement;$('#modal').setAttribute('role','dialog');$('#modal').setAttribute('aria-modal','true');$('#modal').classList.remove('hidden');const f=$('#modal-body form');setTimeout(()=>{const x=$('#modal-body input:not([type=hidden]):not([type=checkbox]),#modal-body select,#modal-body textarea');if(x&&!$('#modal').classList.contains('hidden'))try{x.focus({preventScroll:true});}catch(e){}},30);
  if(f)f.addEventListener('submit',e=>{e.preventDefault();const d=Object.fromEntries(new FormData(f));$$('#modal-body input[type=checkbox][name]').forEach(c=>d[c.name]=c.checked);try{if(onSubmit(d)!==false){closeModal();route();}}catch(err){toast(err.message);}});}
-let modalFrom=null;const closeModal=()=>{const m=$('#modal');if(!m.classList.contains('hidden')){m.classList.add('hidden');refocus(modalFrom);modalFrom=null;}};
+let modalFrom=null;const closeModal=()=>{const m=$('#modal');if(!m.classList.contains('hidden')){m.classList.add('hidden');const back=modalFrom;modalFrom=null;refocus(back);setTimeout(()=>{if($('#modal').classList.contains('hidden')&&(!document.activeElement||document.activeElement===document.body))refocus(back);},0);}};
 // focus back to the opener; if a redraw replaced it, to its twin (same id/data-*), else the page heading (never leave focus on <body>)
 function refocus(el){try{let t=el&&document.body.contains(el)?el:null;if(!t&&el&&el.nodeType===1){if(el.id)t=document.getElementById(el.id);if(!t)for(const a of el.attributes)if(a.name.startsWith('data-')){t=document.querySelector(`[${a.name}="${CSS.escape(a.value)}"]`);if(t)break;}}
  if(!t||t.disabled||!t.getClientRects().length){t=$('#main h2')||$('#main');if(t&&!t.hasAttribute('tabindex'))t.setAttribute('tabindex','-1');}if(t)t.focus({preventScroll:true});}catch(e){}}
@@ -2883,8 +2885,12 @@ const CUSTOMER=TTQROrder.isCustomerHash();   // QR customer link: never create s
 // A brand-new browser gets the sample restaurant (FR_KEY='pending'); the Dashboard shows a small, dismissible choice once. Existing data never gets it.
 const FR_KEY='tabletop_firstrun';
 function frPending(){try{return !CUSTOMER&&localStorage.getItem(FR_KEY)==='pending';}catch(e){return false;}}
-function frDone(v){try{localStorage.setItem(FR_KEY,v||'done');}catch(e){}const b=$('#firstrun');if(b){const had=b.contains(document.activeElement);b.remove();if(had)refocus(null);}}
-function frStartFresh(){if(!confirm('Start fresh? This erases EVERYTHING in this app right now, the sample restaurant and any changes you already made, and gives you an empty one.'))return;
+function frDone(v){try{localStorage.setItem(FR_KEY,v||'done');localStorage.removeItem(FR_KEY+'_sig');}catch(e){}const b=$('#firstrun');if(b){const had=b.contains(document.activeElement);b.remove();if(had)refocus(null);}}
+// fingerprint of what a person edits (names, prices, tables, orders...), not internal flags/migrations, so only real edits count
+function frSig(){try{const pick=(a,ks)=>(Array.isArray(a)?a:[]).map(o=>ks.map(k=>o&&o[k]));const st=DB.settings||{};const j=JSON.stringify([pick(DB.items,['id','name','price','cost','cat_id','available','desc']),pick(DB.categories,['id','name']),pick(DB.tables,['id','name','seats']),pick(DB.orders,['id','status']),pick(DB.reservations,['id','name']),pick(DB.staff,['id','name']),pick(DB.ingredients,['id','name']),[st.name,st.tax,st.address,st.phone]]);let h=0;for(let i=0;i<j.length;i++)h=(h*31+j.charCodeAt(i))|0;return j.length+':'+h;}catch(e){return '';}}
+function frEdited(){try{const s=localStorage.getItem(FR_KEY+'_sig');return !!s&&s!==frSig();}catch(e){return false;}}
+function frStartFresh(){if(frEdited()){frDone('edited');toast('You already changed the sample restaurant, so Start fresh is off to keep your work. To erase everything, export a backup, then use Settings → Reset all data.');return;}
+ if(!confirm('Start fresh? This erases EVERYTHING in this app right now, the sample restaurant and any changes you already made, and gives you an empty one.'))return;
  const p=DB.settings.pin;DB=blank();DB.settings.pin=p;DB.settings.inv_imported=true;try{TTInventory._reset();}catch(e){}try{TTRegulars.reset();}catch(e){}save();CUR=null;frDone('fresh');toast('Fresh start: add a category, then your first item');location.hash='#menu';render();}
 function frShow(){if(!frPending()||!$('#main')||$('#firstrun'))return;
  const d=document.createElement('div');d.id='firstrun';d.className='card firstrun';d.setAttribute('role','region');d.setAttribute('aria-label','Welcome');
@@ -2993,7 +2999,7 @@ function qrSettingsBind(){const f=$('#qrf');if(!f)return;
  f.onsubmit=e=>{e.preventDefault();const t=(f.tok.value||'').trim();if(!t)return toast('Paste the staff token first');try{localStorage.setItem(QR_TOKEN_KEY,t);}catch(x){return toast('Could not store the token in this browser');}
   qrStop();qrSig=null;QRP={pending:[],calls:[],err:'',busy:{}};toast('Staff token saved');render();};
  if($('#qrclear'))$('#qrclear').onclick=()=>{try{localStorage.removeItem(QR_TOKEN_KEY);}catch(x){}qrStop();QRP={pending:[],calls:[],err:'',busy:{}};try{TTQROrder.setServer({url:QR_SERVER_URL,appUrl:QR_APP_URL});}catch(x){}toast('Staff token removed');render();};}
-if(!DB){if(CUSTOMER)DB=blank();else{demoData();try{localStorage.setItem(FR_KEY,'pending');}catch(e){}}}   // brand-new browser: sample data + a one-time welcome choice
+if(!DB){if(CUSTOMER)DB=blank();else{demoData();try{localStorage.setItem(FR_KEY,'pending');localStorage.setItem(FR_KEY+'_sig',frSig());}catch(e){}}}   // brand-new browser: sample data + a one-time welcome choice
 if(!CUSTOMER){try{if(!DB.settings.inv_imported){if(!TTInventory.getIngredients().length&&DB.ingredients.length)TTInventory.importIngredients(DB.ingredients);DB.settings.inv_imported=true;save();}}catch(e){}}
 const reloadDB=()=>{try{const d=JSON.parse(localStorage.getItem(KEY));if(d&&Array.isArray(d.items)&&d.settings){DB=d;migrate();}}catch(e){}};
 const QRO=TTQROrder.tableTopAdapter({getDB:()=>DB,save:save,nid:nid,reload:reloadDB});
