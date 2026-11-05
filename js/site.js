@@ -63,3 +63,25 @@ if(dev){
  var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);var t=e.target;setTimeout(function(){t.style.transitionDelay=''},1200)}})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});
  els.forEach(function(el,i){el.classList.add('rv');el.style.transitionDelay=(el.matches('.card')?(i%3)*80:0)+'ms';io.observe(el)});
 })();
+// Homepage phone bar: after the hero leaves the screen, and only while the layout is narrow.
+(function(){
+ var dock=document.getElementById('dock'),hero=document.querySelector('.hero');
+ if(!dock||!hero||!window.IntersectionObserver||!window.matchMedia)return;
+ var mq=window.matchMedia('(max-width:860px)'),heroOn=true,io;
+ function sync(){
+  var show=mq.matches&&!heroOn;
+  dock.hidden=!show;
+  document.body.classList.toggle('has-dock',show);
+ }
+ function watch(){
+  if(io)io.disconnect();
+  var top=document.querySelector('.top');
+  var px=top?Math.ceil(top.getBoundingClientRect().height):0;
+  io=new IntersectionObserver(function(es){heroOn=!!es[0].isIntersecting;sync()},{threshold:0,rootMargin:'-'+px+'px 0px 0px 0px'});
+  io.observe(hero);
+ }
+ watch();
+ if(mq.addEventListener)mq.addEventListener('change',sync);
+ else if(mq.addListener)mq.addListener(sync);
+ window.addEventListener('resize',watch);
+})();
