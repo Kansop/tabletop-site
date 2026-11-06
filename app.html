@@ -916,6 +916,7 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
         state.carts = d.carts && typeof d.carts === 'object' && !Array.isArray(d.carts) ? d.carts : {};
         state.baseUrl = typeof d.baseUrl === 'string' ? d.baseUrl.slice(0, 500) : '';
         state.guestName = typeof d.guestName === 'string' ? clean(d.guestName, 40) : '';
+        state.deviceId = typeof d.deviceId === 'string' && safeId(d.deviceId) ? d.deviceId : '';
         state.orders = {};   // guest orders placed through the shared server (private token kept on this phone only)
         if (d.orders && typeof d.orders === 'object' && !Array.isArray(d.orders)) Object.keys(d.orders).forEach(function (k) {
           var r = d.orders[k];
@@ -975,10 +976,16 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
     if (/^[a-z][a-z0-9+.\-]*:/i.test(u) || /^\/\//.test(u) || /(^|\/)\.\.(\/|$)/.test(u)) return '';
     return /^[A-Za-z0-9_\-.\/%~+=&?#]+$/.test(u) ? u : '';
   }
+  // Same id twice would show two cards but charge the first match - keep the first of each id (matches the server).
+  function firstById(arr) {
+    var seen = {}, out = [];
+    (arr || []).forEach(function (x) { var k = String(x.id); if (seen[k]) return; seen[k] = 1; out.push(x); });
+    return out;
+  }
   function normalizeMenu(raw) {
     raw = raw || {};
-    var cats = (raw.categories || []).map(function (c) { return { id: c.id, name: clean(c.name, 60) }; });
-    var items = (raw.items || []).map(function (i) {
+    var cats = firstById((raw.categories || []).map(function (c) { return { id: c.id, name: clean(c.name, 60) }; }).filter(function (c) { return c.name && c.id != null; }));
+    var items = firstById((raw.items || []).map(function (i) {
       var all = parseAllergens(i.tags).concat(parseAllergens(i.allergens), parseAllergens(i.allergy_tags), parseAllergens(i.allergy));
       var seen = {}; all = all.filter(function (a) { var k = a.toLowerCase(); if (seen[k]) return false; seen[k] = 1; return true; });
       return {
@@ -988,7 +995,7 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
         allergens: all.filter(function (a) { return !isGoodTag(a) && !(isBadgeTag(a) && !/^spicy$/i.test(a)); }), diet: all.filter(isGoodTag), badges: all.filter(isBadgeTag),
         emoji: typeof i.emoji === 'string' ? clean(i.emoji, 8) : ''
       };
-    }).filter(function (i) { return i.name && i.id != null; });
+    }).filter(function (i) { return i.name && i.id != null; }));
     return { categories: cats, items: items };
   }
 
@@ -1636,8 +1643,16 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
         if (destroyed) return;
         if (x.ok && x.data && x.data.status) {
           var hadErr = !!ui.pollErr; ui.pollErr = '';
-          if (r.status !== x.data.status || r.message !== x.data.message) { r.status = x.data.status; r.act = Date.now(); if ((r.status === 'ready' || r.status === 'served') && !r.servedAt) r.servedAt = r.act; if (FINAL[r.status] && r.status !== 'paid' && !r.doneAt) r.doneAt = r.act; r.message = x.data.message || ''; if (x.data.total != null) r.total = x.data.total; saveOrWarn(); paint(); }
-          else if (hadErr) paint();
+          var newTot = x.data.total != null ? x.data.total : r.total;
+          // Status, message, OR total can change on their own (staff adding lines bumps the total with no status change).
+          if (r.status !== x.data.status || r.message !== x.data.message || r.total !== newTot) {
+            r.status = x.data.status; r.act = Date.now();
+            if ((r.status === 'ready' || r.status === 'served') && !r.servedAt) r.servedAt = r.act;
+            if (FINAL[r.status] && r.status !== 'paid' && !r.doneAt) r.doneAt = r.act;
+            r.message = x.data.message || '';
+            if (x.data.total != null) r.total = x.data.total;
+            saveOrWarn(); paint();
+          } else if (hadErr) paint();
         } else if (!x.offline && (x.status === 404 || x.status === 410 || x.error === 'not_found')) {
           // The server clearly says this order no longer exists: drop it from this phone's history (never on a network error).
           delete state.orders[r.id]; if (ui.done === r.id) ui.done = null; saveOrWarn(); draw();
@@ -1687,6 +1702,8 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
         var sig = JSON.stringify(body);   // same cart => same client_id on retry (no double order); changed cart => new id
         if (!c.draft || c.draft.sig !== sig) { c.draft = { id: newDraftId(), sig: sig }; saveOrWarn(); }
         body.client_id = c.draft.id;
+        if (!state.deviceId || !safeId(state.deviceId)) { state.deviceId = newDraftId(); saveOrWarn(); }   // stable per-phone id for the server's submitPerDevice limit
+        body.device_id = state.deviceId;
         return sFetch('POST', '/orders', { body: body }).then(function (x) {
           if (destroyed) return;
           if (x.ok && x.data && /^o_[a-z0-9]{12}$/.test(String(x.data.id)) && typeof x.data.token === 'string' && x.data.token) {
