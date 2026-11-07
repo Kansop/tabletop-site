@@ -1954,10 +1954,13 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
       var t = e.target;
       if (t.dataset && t.dataset.avoid != null) { ui.avoid[t.dataset.avoid] = t.checked; draw(); }
       else if (t.dataset && t.dataset.mod != null) {
-        // Redraw so "Add to order · $X" includes the add-on; keep the note draft like the qty stepper does.
+        // Update "Add to order · $X" in place (no full redraw — keeps checkbox focus and avoids mid-click DOM swaps).
         ui.openOpts[t.dataset.mod] = t.checked;
-        var nt = container.querySelector('#ttq-inote'); if (nt) ui.noteDraft = nt.value;
-        draw();
+        var it2 = findItem(menu(), ui.open), btn = container.querySelector('[data-confirm]');
+        if (it2 && btn) {
+          var unit2 = it2.price + it2.mods.reduce(function (a, md, idx) { return a + (ui.openOpts[idx] ? md.p : 0); }, 0);
+          btn.innerHTML = 'Add to order &middot; ' + money(r2(unit2 * (ui.sqty || 1)));
+        }
       }
     }
     if (customerCtl) customerCtl.destroy();
