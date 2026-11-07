@@ -22,7 +22,7 @@ if(f){
  };
  var done=function(name){
   $('#tname').textContent=name?', '+name.split(' ')[0]:'';
-  f.style.display='none';thanks.style.display='block';thanks.scrollIntoView({block:'center'});
+  f.hidden=true;thanks.hidden=false;thanks.scrollIntoView({block:'center'});
  };
  f.addEventListener('submit',function(e){
   e.preventDefault();if(btn.disabled)return;
@@ -46,7 +46,7 @@ if(f){
   }catch(err){reset();fail()}
  });
  f.addEventListener('input',function(e){e.target.classList.remove('invalid')});
- $('#againwl').addEventListener('click',function(){f.reset();errBox.hidden=true;f.style.display='';thanks.style.display='none'});
+ $('#againwl').addEventListener('click',function(){f.reset();errBox.hidden=true;f.hidden=false;thanks.hidden=true});
 }
 // Tour page: desktop/phone preview toggle
 var dev=$('#dev');

@@ -1953,7 +1953,12 @@ html.tt-dark .seg{background:#0f172a}html.tt-dark .seg button{background:transpa
     function onChange(e) {
       var t = e.target;
       if (t.dataset && t.dataset.avoid != null) { ui.avoid[t.dataset.avoid] = t.checked; draw(); }
-      else if (t.dataset && t.dataset.mod != null) { ui.openOpts[t.dataset.mod] = t.checked; }
+      else if (t.dataset && t.dataset.mod != null) {
+        // Redraw so "Add to order · $X" includes the add-on; keep the note draft like the qty stepper does.
+        ui.openOpts[t.dataset.mod] = t.checked;
+        var nt = container.querySelector('#ttq-inote'); if (nt) ui.noteDraft = nt.value;
+        draw();
+      }
     }
     if (customerCtl) customerCtl.destroy();
     function onImgError(e) { var t = e.target; if (!t || t.tagName !== 'IMG' || !/\bttq-img\b/.test(t.className)) return; var ph = t.parentNode, box = ph && ph.parentNode; if (box && /\bttq-hit\b/.test(box.className)) { var card = box.parentNode; box.parentNode.removeChild(box); if (card && card.classList) card.classList.add('nopic'); } else if (ph && /\bttq-ph\b/.test(ph.className) && box) box.removeChild(ph); else if (ph) ph.removeChild(t); }
